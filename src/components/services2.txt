@@ -1,0 +1,123 @@
+"use client";
+import { useState } from 'react';
+import { FaPassport, FaFileAlt, FaCertificate, FaSignature, FaIdCard, FaTimes, FaCheckCircle } from 'react-icons/fa';
+
+// تعريف المتطلبات (يمكنك تعديل القوائم أدناه بسهولة)
+const servicesRequirements: Record<string, string[]> = {
+  "جوازات سفر (حملة الهوية)": [
+    "جواز السفر (الأصل )",
+    "الهوية الفلسطينية الأصلية (أو صورة واضحة)",
+    "الإفامة القطرية (الاصل)",
+    "حضور صاحب العلاقة شخصياً للتوقيع والتبصيم و التصوير"
+  ],
+  "جوازات سفر (استعمال خارجي)": [
+    "وثيقة السفر الحالية (الأصل + صورة)",
+    "شهادة الميلاد الأصلية مصدقة",
+    "صورة عن الإقامة القطرية سارية المفعول",
+    "كتاب موجه لسعادة السفير يشرح الحاجة للجواز"
+  ],
+  "الإفادات القنصلية": [
+    "جواز السفر أو الهوية الأصلية",
+    "الوثائق الداعمة للإفادة (حسب نوع الطلب)",
+    "حضور صاحب العلاقة أو وكيله القانوني"
+  ],
+  "التصديقات": [
+    "الوثيقة الأصلية مصدقة من الجهات المختصة",
+    "صورة ضوئية عن كل وثيقة مطلوب تصديقها",
+    "إثبات شخصية للمتقدم بالطلب"
+  ],
+  "الوكالات العدلية": [
+    "حضور الموكل شخصياً مع إثبات الشخصية الأصلي",
+    "بيانات الوكيل كاملة (الاسم الرباعي، رقم الهوية، العنوان)",
+    "رسوم الوكالة المقررة"
+  ]
+};
+
+export default function Services() {
+  const [selectedService, setSelectedService] = useState<string | null>(null);
+
+  const consularServices = [
+    { title: "جوازات سفر (حملة الهوية)", desc: "إجراءات تجديد وإصدار جوازات السفر للمواطنين حملة الهوية الفلسطينية.", icon: <FaPassport />, tag: "دائم", color: "bg-blue-50 text-blue-600 border-blue-100" },
+    { title: "جوازات سفر (استعمال خارجي)", desc: "إجراءات إصدار وتجديد الجوازات الخاصة للاستعمال الخارجي لحملة الوثائق.", icon: <FaIdCard />, tag: "مؤقت", color: "bg-indigo-50 text-indigo-600 border-indigo-100" },
+    { title: "الإفادات القنصلية", desc: "إصدار كافة أنواع الإفادات الرسمية (سكن، حالة اجتماعية، إثباتات قنصلية).", icon: <FaFileAlt />, tag: "رسمي", color: "bg-amber-50 text-amber-600 border-amber-100" },
+    { title: "التصديقات", desc: "تصديق الشهادات العلمية، الوثائق الرسمية، والشهادات الصادرة من الوطن.", icon: <FaCertificate />, tag: "قانوني", color: "bg-purple-50 text-purple-600 border-purple-100" },
+    { title: "الوكالات العدلية", desc: "تنظيم وتصديق الوكالات العامة والخاصة لضمان الحقوق القانونية.", icon: <FaSignature />, tag: "عدلي", color: "bg-rose-50 text-rose-600 border-rose-100" },
+  ];
+
+  return (
+    <section id="services" className="py-24 bg-white" dir="rtl">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-right mb-16">
+          <h2 className="text-4xl font-black text-[#1e1b4b] mb-4">
+            الخدمات <span className="text-[#c5a059]">القنصلية</span>
+          </h2>
+          <div className="w-24 h-1.5 bg-[#c5a059] rounded-full"></div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {consularServices.map((service, index) => (
+            <div 
+              key={index}
+              onClick={() => setSelectedService(service.title)}
+              className={`group cursor-pointer relative bg-white p-10 rounded-[3rem] border-2 ${service.color.split(' ')[2]} shadow-sm hover:shadow-2xl transition-all duration-500`}
+            >
+              <div className={`absolute top-6 left-6 px-3 py-1 rounded-full text-[10px] font-black uppercase ${service.color}`}>
+                {service.tag}
+              </div>
+              <div className={`w-16 h-16 ${service.color.split(' ')[0]} ${service.color.split(' ')[1]} rounded-2xl flex items-center justify-center mb-8`}>
+                <div className="text-3xl">{service.icon}</div>
+              </div>
+              <h3 className="text-2xl font-black text-[#1e1b4b] mb-4 group-hover:text-[#c5a059] transition-colors">{service.title}</h3>
+              <p className="text-slate-500 leading-relaxed mb-8 font-medium">{service.desc}</p>
+              <div className="text-[#1e1b4b] font-black flex items-center gap-2">
+                <span>عرض المتطلبات</span>
+                <span className="text-[#c5a059]">←</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Modal - النافذة المنبثقة */}
+        {selectedService && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-[#1e1b4b]/60 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden relative animate-in fade-in zoom-in duration-300">
+              <button 
+                onClick={() => setSelectedService(null)}
+                className="absolute top-6 left-6 text-slate-400 hover:text-red-500 transition-colors"
+              >
+                <FaTimes size={24} />
+              </button>
+              
+              <div className="p-10">
+                <h3 className="text-3xl font-black text-[#1e1b4b] mb-6 border-r-8 border-[#c5a059] pr-4">
+                  متطلبات {selectedService}
+                </h3>
+                
+                <div className="space-y-4">
+                  {servicesRequirements[selectedService]?.map((req, i) => (
+                    <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <FaCheckCircle className="text-[#c5a059] mt-1 shrink-0" />
+                      <p className="text-slate-700 font-bold leading-relaxed">{req}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-10 flex gap-4">
+                  <button className="flex-1 bg-[#1e1b4b] text-white py-4 rounded-2xl font-black hover:bg-[#c5a059] transition-all">
+                    بدء المعاملة إلكترونياً
+                  </button>
+                  <button 
+                    onClick={() => setSelectedService(null)}
+                    className="px-8 py-4 border-2 border-slate-100 text-slate-400 rounded-2xl font-black hover:bg-slate-50 transition-all"
+                  >
+                    إغلاق
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}

@@ -1,0 +1,62 @@
+"use client";
+import { useState } from 'react';
+import { FaCalendarAlt, FaClock, FaUser, FaPhone, FaTimes } from 'react-icons/fa';
+
+export default function BookingSystem({ isOpen, onClose, serviceName }: { isOpen: boolean, onClose: () => void, serviceName: string }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center p-4 bg-[#1e1b4b]/90 backdrop-blur-md">
+      <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-300 text-right" dir="rtl">
+        
+        {/* رأس النافذة */}
+        <div className="bg-[#1e1b4b] p-6 text-white relative">
+          <button onClick={onClose} className="absolute top-6 left-6 hover:text-[#c5a059] transition-colors"><FaTimes size={20} /></button>
+          <h3 className="text-xl font-black">حجز موعد جديد</h3>
+          <p className="text-sm text-slate-300 mt-1">{serviceName}</p>
+        </div>
+
+        <div className="p-8 space-y-5">
+          {/* حقل الاسم */}
+          <div>
+            <label className="block text-sm font-black text-[#1e1b4b] mb-2 flex items-center gap-2">
+              <FaUser className="text-[#c5a059]" /> الاسم الرباعي
+            </label>
+            <input 
+  type="text" 
+  placeholder="أدخل اسمك كما في الجواز" 
+  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-[#c5a059] outline-none font-bold text-[#1e1b4b] placeholder-slate-500" 
+/>
+          </div>
+
+          {/* حقل التاريخ والوقت */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-black text-[#1e1b4b] mb-2 flex items-center gap-2">
+                <FaCalendarAlt className="text-[#c5a059]" /> التاريخ
+              </label>
+             <input 
+  type="date" 
+  className="w-full p-4 bg-slate-50 border border-slate-200 text-[#1e1b4b] rounded-2xl outline-none font-bold text-[#1e1b4b]" 
+/>
+            </div>
+            <div>
+              <label className="block text-sm font-black text-[#1e1b4b] mb-2 flex items-center gap-2">
+                <FaClock className="text-[#c5a059]" /> الوقت
+              </label>
+              <select className="w-full p-4 bg-slate-50 border text-[#1e1b4b] border-slate-200 rounded-2xl outline-none font-bold">
+                <option>09:00 صباحاً</option>
+                <option>10:00 صباحاً</option>
+                <option>11:00 صباحاً</option>
+              </select>
+            </div>
+          </div>
+
+          <button className="w-full bg-[#c5a059] text-[#1e1b4b] py-5 rounded-2xl font-black text-lg hover:bg-[#1e1b4b] hover:text-white transition-all shadow-xl">
+            تأكيد حجز الموعد
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

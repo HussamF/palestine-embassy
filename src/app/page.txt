@@ -1,0 +1,48 @@
+"use client"; // Client component for interactivity | مكون تفاعلي يعمل لدى المستخدم
+import { useState } from 'react';
+import Navbar from '../components/Navbar'; // Navigation Bar | شريط التنقل العلوي
+import Hero from '../components/Hero'; // Hero Section | قسم الترحيب الرئيسي
+import News from '../components/News'; // News Section | قسم الأخبار
+import Services from '../components/Services'; // Services Section | قسم الخدمات
+import Footer from '../components/Footer'; // Footer Section | تذييل الصفحة
+import BookingSystem from '../components/BookingSystem'; // Appointment Modal | نظام حجز المواعيد
+
+export default function Home() {
+  // --- States for Booking Modal | حالات التحكم في مودال الحجز ---
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedServiceName, setSelectedServiceName] = useState(""); // Selected Service | الخدمة المختارة
+
+  // --- Handle opening the booking modal | دالة لفتح الحجز مع تحديد نوع الخدمة ---
+  const handleOpenBooking = (serviceName: string) => {
+    setSelectedServiceName(serviceName);
+    setIsBookingOpen(true);
+  };
+
+  return (
+    <main className="bg-white">
+      {/* 1. Floating Navbar | النافبار الثابت */}
+      <Navbar />
+      
+      {/* No wrapper div needed here because we added padding inside Hero.tsx 
+          لا نحتاج لحاوية هنا لأننا أضفنا مساحة الأمان داخل ملف الهيرو مباشرة لإلغاء الفراغ الأبيض
+      */}
+      <Hero onBookClick={handleOpenBooking} />
+      
+      {/* 2. Main Sections | الأقسام الرئيسية للموقع */}
+      <News />
+      <Services />
+
+      {/* 3. Booking Modal | نظام حجز المواعيد */}
+      <BookingSystem 
+        isOpen={isBookingOpen} 
+        // Fixed: Use setIsBookingOpen instead of setIsOpen 
+        // تصحيح: استخدام الاسم الصحيح للحالة لإغلاق المودال
+        onClose={() => setIsBookingOpen(false)} 
+        serviceName={selectedServiceName} 
+      />
+      
+      {/* 4. Footer | تذييل الصفحة */}
+      {/* <Footer /> */}
+    </main>
+  );
+}

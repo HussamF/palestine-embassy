@@ -1,0 +1,92 @@
+"use client";
+
+import { useState } from 'react';
+
+const servicesData = [
+  { 
+    id: 1, 
+    title: "تجديد جوازات السفر", 
+    category: "أفراد",
+    docs: ["جواز السفر الأصلي", "الهوية الحالية", "اقامة قطرية سارية"],
+    icon: "👤"
+  },
+  { 
+    id: 2, 
+    title: "الإفادات الخاصة بالسفارة المصرية", 
+    category: "أعمال",
+    docs: [, "صورة هوية ", "الوثيقة", "الاقامة القطرية"], // زدت نص هنا للتجربة
+    icon: "🏢"
+  },
+  { 
+    id: 3, 
+    title: " الوكالات و التصديقات", 
+    category: "عام",
+    docs: ["ملخص القضية", "المستندات ذات الصلة", "الهوية" ],
+    icon: "⚖️"
+  }
+];
+
+export default function Services() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const filteredServices = servicesData.filter(service => service.title.includes(searchTerm));
+
+  return (
+    <section className="py-24 bg-slate-50" dir="rtl">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-black text-slate-900 mb-6">دليل الخدمات القنصلية</h2>
+       <input 
+  type="text" 
+  placeholder="ابحث عن خدمة..." 
+  className="w-full px-6 py-4 
+             bg-indigo-50/50 
+             border border-indigo-100 
+             rounded-2xl outline-none 
+             text-indigo-950 font-bold          /* لون الخط عند الكتابة أصبح أغمق */
+             
+             /* تعديل لون الـ placeholder ليصبح أغمق وأوضح */
+             placeholder:text-indigo-500/80    /* درجة غامقة وواضحة */
+             text-right 
+             
+             focus:ring-2 focus:ring-[#c5a059] 
+             focus:bg-white 
+             transition-all"
+/>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch"> {/* h-full/items-stretch لتوحيد ارتفاع الكروت */}
+          {filteredServices.map((service) => (
+            <div key={service.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm hover:shadow-2xl transition-all border border-slate-100 group flex flex-col"> {/* flex flex-col هنا هي السر */}
+              
+              {/* محتوى الكرت العلوي */}
+              <div className="flex-grow"> {/* flex-grow ستأخذ كل المساحة المتاحة وتدفع الزر للأسفل */}
+                <div className="text-4xl mb-6">{service.icon}</div>
+                <span className="text-[#c5a059] text-sm font-bold bg-blue-50 px-3 py-1 rounded-full">
+                  {service.category}
+                </span>
+                <h3 className="text-2xl font-bold text-slate-800 mt-4 mb-6 group-hover:text-[#c5a059] transition">
+                  {service.title}
+                </h3>
+                
+                <div className="space-y-3 mb-8">
+                  <p className="text-sm font-bold text-slate-500">الأوراق المطلوبة:</p>
+                  {service.docs.map((doc, index) => (
+                    <div key={index} className="flex items-center text-slate-600 text-sm">
+                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full ml-2"></span>
+                      {doc}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* الزر الآن سيبقى دائماً في أسفل الكرت وعلى مستوى واحد مع جيرانه */}
+              <button className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-text-[#c5a059] transition-all mt-auto">
+                ابدأ الخدمة الآن
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

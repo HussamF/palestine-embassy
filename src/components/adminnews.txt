@@ -1,0 +1,476 @@
+"use client";
+import { useState, useRef, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
+import { 
+  FaVideo, FaImage, FaPlay, FaSearch, FaEdit, FaEye, FaCalendarAlt,
+  FaMobileAlt, FaDesktop, FaThumbtack, FaSave, FaExclamationTriangle, 
+  FaInfoCircle, FaBell, FaTimes, FaTrashAlt 
+} from 'react-icons/fa';
+
+/** * 1. تحميل محرر النصوص (ReactQuill) ديناميكياً */
+const ReactQuill = dynamic(
+  async () => {
+    const { default: RQ } = await import("react-quill-new");
+    const Component = ({ forwardedRef, ...props }: any) => <RQ ref={forwardedRef} {...props} />;
+    Component.displayName = 'ReactQuillEditor';
+    return Component;
+  },
+  { 
+    ssr: false,
+    loading: () => <div className="h-64 bg-slate-50 animate-pulse rounded-[2rem] border-2 border-dashed border-slate-200 flex items-center justify-center font-bold text-slate-400">جاري تحميل محرر التنسيق...</div>
+  }
+);
+
+import 'react-quill-new/dist/quill.snow.css';
+
+// تعريف أنواع البيانات المستخدمة
+interface MediaItem {
+  url: string;
+  type: 'image' | 'video';
+  file?: File;
+}
+
+interface NewsEntry {
+  id: number;
+  title: string;
+  category: string;
+  date: string;
+  image: string; 
+  images?: string[]; 
+  content?: string;
+  excerpt?: string; 
+  is_pinned?: boolean;
+}
+
+export default function AdminNews() {
+  const [mounted, setMounted] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null); 
+  const [title, setTitle] = useState('');
+  const [excerpt, setExcerpt] = useState(''); 
+  const [fullContent, setFullContent] = useState('');
+  const [category, setCategory] = useState('لقاءات وبيانات السفير');
+  const [isPinned, setIsPinned] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('الكل');
+  const [archiveData, setArchiveData] = useState<NewsEntry[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [alertText, setAlertText] = useState("السفارة مغلقة يوم الأحد القادم...");
+  const [isAlertActive, setIsAlertActive] = useState(true);
+  const [alertType, setAlertType] = useState<'emergency' | 'info'>('emergency');
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const quillRef = useRef<any>(null);
+
+  // --- 1. جلب البيانات ---
+  const fetchArchive = async () => {
+    try {
+      const response = await fetch('/api/news');
+      if (response.ok) {
+        const data = await response.json();
+        const formattedData = data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          category: item.category,
+          content: item.content,
+          excerpt: item.excerpt,
+          is_pinned: item.is_pinned,
+          date: new Date(item.created_at).toLocaleDateString('ar-EG'),
+          image: (item.images && item.images.length > 0) ? item.images[0] : (item.image || "/imgs/news/sub-news1.jpg"),
+          images: item.images || []
+        }));
+        setArchiveData(formattedData);
+      }
+    } catch (error) {
+      console.error("Failed to fetch archive:", error);
+    }
+  };
+
+  useEffect(() => {
+    setMounted(true);
+    fetchArchive();
+    const savedAlert = localStorage.getItem('siteAlert');
+    if (savedAlert) {
+      const parsed = JSON.parse(savedAlert);
+      setAlertText(parsed.text);
+      setIsAlertActive(parsed.active);
+      setAlertType(parsed.type);
+    }
+  }, []);
+
+  // --- 2. دالة التثبيت الذكي (إلغاء الكل وتثبيت واحد) ---
+  const handleTogglePin = async (item: NewsEntry) => {
+    // إذا كان الخبر مثبت أصلاً، نلغي تثبيته، وإذا لم يكن، نثبته ونلغي الباقي
+    const newPinStatus = !item.is_pinned;
+    
+    try {
+      // نرسل طلب تحديث للسيرفر
+      // ملاحظة: الـ API سيتكفل بجعل البقية FALSE إذا أرسلنا isPinned: true
+      const response = await fetch('/api/news', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...item,
+          isPinned: newPinStatus,
+          // نرسل الصور الحالية كما هي لكي لا تضيع أثناء تحديث التثبيت
+          images: item.images
+        }),
+      });
+
+      if (response.ok) {
+        fetchArchive(); // تحديث القائمة فوراً
+      }
+    } catch (error) {
+      alert("فشل تحديث حالة التثبيت");
+    }
+  };
+
+  // --- 3. دالة الحذف ---
+  const handleDelete = async (id: number) => {
+    if (confirm("هل أنت متأكد من حذف هذا الخبر نهائياً من قاعدة البيانات؟")) {
+      try {
+        const res = await fetch(`/api/news?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          alert("تم الحذف بنجاح");
+          fetchArchive();
+        }
+      } catch (error) {
+        alert("خطأ في الاتصال");
+      }
+    }
+  };
+
+  // --- 4. دالة النشر والتعديل ---
+  const handlePublish = async () => {
+    if (!title) return alert("يرجى إدخال عنوان الخبر");
+    if (isPublishing) return;
+    setIsPublishing(true);
+    const mediaUrls = selectedMedia.filter(m => m.type === 'image').map(m => m.url);
+
+    try {
+      const method = editingId ? 'PUT' : 'POST';
+      const response = await fetch('/api/news', {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingId,
+          title,
+          excerpt,
+          content: fullContent,
+          category,
+          images: mediaUrls,
+          isPinned
+        }),
+      });
+
+      if (response.ok) {
+        alert(editingId ? "تم تحديث الخبر بنجاح!" : "تم نشر الخبر بنجاح!");
+        cancelEdit();
+        fetchArchive();
+      }
+    } catch (error) {
+      alert("فشل الاتصال بالسيرفر");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleEditPreview = (item: NewsEntry) => {
+    setEditingId(item.id);
+    setTitle(item.title);
+    setExcerpt(item.excerpt || '');
+    setCategory(item.category);
+    setFullContent(item.content || '');
+    setIsPinned(item.is_pinned || false);
+    if (item.images && item.images.length > 0) {
+        setSelectedMedia(item.images.map(img => ({ url: img, type: 'image' })));
+    } else {
+        setSelectedMedia([{ url: item.image, type: 'image' }]);
+    }
+    window.scrollTo({ top: 400, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setTitle('');
+    setExcerpt('');
+    setFullContent('');
+    setSelectedMedia([]);
+    setIsPinned(false);
+  };
+
+  const handleFileSelection = (files: FileList | null, type: 'image' | 'video' | 'mixed') => {
+    if (!files) return;
+    const newMedia: MediaItem[] = Array.from(files).map(file => ({
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith('video') ? 'video' : 'image',
+      file: file
+    }));
+    setSelectedMedia(prev => [...prev, ...newMedia]);
+  };
+
+  const removeMedia = (index: number) => {
+    const updated = [...selectedMedia];
+    URL.revokeObjectURL(updated[index].url);
+    updated.splice(index, 1);
+    setSelectedMedia(updated);
+  };
+
+  const saveAlertSettings = () => {
+    const alertSettings = { text: alertText, active: isAlertActive, type: alertType };
+    localStorage.setItem('siteAlert', JSON.stringify(alertSettings));
+    alert("تم تحديث الشريط العلوي بنجاح!");
+  };
+
+  const quillModules = useMemo(() => ({
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      [{ 'size': ['small', false, 'large', 'huge'] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'color': [] }, { 'background': [] }],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'direction': 'rtl' }, { 'align': [] }],
+      ['link', 'image', 'video'],
+      ['clean']
+    ],
+  }), []);
+
+  const filteredArchive = archiveData.filter(item => {
+    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = filterCategory === 'الكل' || item.category.includes(filterCategory);
+    return matchesSearch && matchesCategory;
+  });
+
+  if (!mounted) return null;
+
+  return (
+    <div className="p-4 md:p-10 bg-[#f8fafc] min-h-screen font-sans text-right" dir="rtl">
+      
+      {/* الهيدر */}
+      <div className="max-w-7xl mx-auto mb-8 bg-[#1e1b4b] p-8 rounded-[3rem] text-white shadow-2xl flex justify-between items-center relative overflow-hidden">
+        <div className="relative z-10">
+          <h1 className="text-3xl font-black italic">لوحة التحكم بالأخبار</h1>
+          <p className="text-[#c5a059] font-bold mt-1 tracking-wide">نظام إدارة المحتوى - سفارة فلسطين</p>
+        </div>
+        <FaThumbtack className="absolute left-10 text-[#c5a059] opacity-20 rotate-45" size={100} />
+      </div>
+
+      {/* إدارة شريط التنبيه */}
+      <section className="max-w-7xl mx-auto mb-12 bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+        <div className="flex flex-col lg:flex-row">
+          <div className="p-8 lg:w-1/3 bg-slate-50 border-l border-slate-100 flex flex-col justify-center">
+            <h3 className="text-lg font-black text-[#1e1b4b] mb-6 flex items-center gap-3 italic">
+              <FaBell className={isAlertActive ? "text-green-500 animate-bounce" : "text-slate-300"} />
+              التنبيه العلوي للموقع
+            </h3>
+            <div className="space-y-4">
+              <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+                <button onClick={() => setIsAlertActive(true)} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all ${isAlertActive ? 'bg-[#1e1b4b] text-[#c5a059] shadow-md' : 'text-slate-400'}`}>تفعيل البانر</button>
+                <button onClick={() => setIsAlertActive(false)} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all ${!isAlertActive ? 'bg-red-600 text-white shadow-md' : 'text-slate-400'}`}>تعطيل الآن</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setAlertType('emergency')} className={`p-3 rounded-xl border-2 font-black text-[10px] transition-all ${alertType === 'emergency' ? 'border-red-500 bg-red-50 text-red-600' : 'border-slate-100 text-slate-400'}`}>حالة طارئة</button>
+                <button onClick={() => setAlertType('info')} className={`p-3 rounded-xl border-2 font-black text-[10px] transition-all ${alertType === 'info' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>تنبيه عام</button>
+              </div>
+            </div>
+          </div>
+          <div className="p-8 lg:w-2/3 flex flex-col justify-center bg-white relative">
+            <label className="text-[10px] font-black text-slate-400 mb-3 mr-2 flex items-center gap-2"><FaEdit /> نص التنبيه المباشر:</label>
+            <div className="flex flex-col md:flex-row gap-4">
+              <input type="text" value={alertText} onChange={(e) => setAlertText(e.target.value)} placeholder="نص التنبيه..." className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-[#c5a059] outline-none font-bold text-[#1e1b4b] text-lg transition-all shadow-inner placeholder:text-slate-400" />
+              <button onClick={saveAlertSettings} className="bg-[#1e1b4b] text-[#c5a059] px-10 rounded-2xl font-black text-sm hover:bg-[#c5a059] hover:text-[#1e1b4b] transition-all shadow-lg active:scale-95">حفظ ونشر</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* محرر محتوى الخبر */}
+      <div className="max-w-7xl mx-auto mb-12">
+          <section className="bg-white rounded-[2.5rem] shadow-xl p-8 border border-slate-100">
+            <div className="flex justify-between items-center mb-8">
+                <h2 className="text-xl font-black text-[#1e1b4b] border-r-4 border-[#c5a059] pr-4 italic">
+                  {editingId ? `تعديل خبر: (ID: ${editingId})` : "تحرير خبر جديد"}
+                </h2>
+                {editingId && (
+                  <button onClick={cancelEdit} className="text-red-500 font-bold text-sm underline">إلغاء التعديل</button>
+                )}
+            </div>
+            <div className="space-y-6">
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="عنوان الخبر..." className="w-full p-5 rounded-2xl bg-slate-50 border border-slate-200 focus:border-[#c5a059] outline-none font-black text-[#1e1b4b] text-xl transition-all shadow-sm text-right" dir="rtl" />
+              <textarea rows={2} value={excerpt} onChange={(e) => setExcerpt(e.target.value)} placeholder="ملخص الخبر..." className="w-full p-5 rounded-2xl bg-slate-50 border border-slate-200 focus:border-[#c5a059] outline-none font-bold text-[#1e1b4b] resize-none shadow-sm text-right" dir="rtl" />
+              
+              <style>{`
+                .ql-editor { direction: rtl !important; color: black !important; text-align: right !important; min-height: 350px; font-size: 1.1rem; line-height: 1.8 !important; }
+                .ql-editor ol, .ql-editor ul { padding-right: 2em !important; padding-left: 0 !important; }
+                .ql-editor li { text-align: right; }
+                .ql-editor.ql-blank::before { right: 15px !important; left: auto !important; text-align: right !important; font-style: normal; }
+              `}</style>
+              
+              <div className="rounded-[2rem] overflow-hidden border-2 border-slate-200 bg-white shadow-inner" dir="rtl">
+                <ReactQuill 
+                  forwardedRef={quillRef}
+                  theme="snow" 
+                  value={fullContent} 
+                  onChange={setFullContent} 
+                  modules={quillModules} 
+                  placeholder="اكتب المحتوى الكامل للخبر هنا..." 
+                />
+              </div>
+
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileSelection(e.dataTransfer.files, 'mixed'); }}
+                className={`grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border-4 border-dashed rounded-[2rem] transition-all ${isDragging ? 'border-[#c5a059] bg-amber-50' : 'border-slate-100'}`}
+              >
+                  <button onClick={() => photoInputRef.current?.click()} className="flex items-center justify-center gap-3 p-6 bg-white border-2 border-slate-200 rounded-2xl hover:border-[#c5a059] transition-all shadow-sm text-[#1e1b4b]">
+                    <FaImage className="text-[#c5a059]" size={24} />
+                    <span className="font-black text-sm">إضافة صور (يمكنك اختيار عدة صور)</span>
+                    <input type="file" ref={photoInputRef} hidden onChange={(e) => handleFileSelection(e.target.files, 'image')} accept="image/*" multiple />
+                  </button>
+                  <button onClick={() => videoInputRef.current?.click()} className="flex items-center justify-center gap-3 p-6 bg-white border-2 border-slate-200 rounded-2xl hover:border-[#c5a059] transition-all shadow-sm text-[#1e1b4b]">
+                    <FaVideo className="text-[#c5a059]" size={24} />
+                    <span className="font-black text-sm">رفع فيديو</span>
+                    <input type="file" ref={videoInputRef} hidden onChange={(e) => handleFileSelection(e.target.files, 'video')} accept="video/*" />
+                  </button>
+              </div>
+
+              {selectedMedia.length > 0 && (
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  {selectedMedia.map((media, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group border-2 border-white shadow-sm">
+                      {media.type === 'image' ? <img src={media.url} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full bg-slate-800 flex items-center justify-center text-white"><FaPlay size={12} /></div>}
+                      <button onClick={() => removeMedia(idx)} className="absolute top-1 right-1 bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-xl"><FaTimes size={10} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+      </div>
+
+      {/* قسم المعاينة المباشرة */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <h2 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-3 italic"><FaEye className="text-[#c5a059]" /> مركز المعاينة المباشرة</h2>
+            <div className="flex bg-slate-200 p-1.5 rounded-2xl gap-2 shadow-inner">
+              <button onClick={() => setPreviewDevice('desktop')} className={`px-6 py-2.5 rounded-xl font-black text-xs transition-all ${previewDevice === 'desktop' ? 'bg-[#1e1b4b] text-[#c5a059]' : 'text-slate-500'}`}><FaDesktop className="inline ml-2"/>كمبيوتر</button>
+              <button onClick={() => setPreviewDevice('mobile')} className={`px-6 py-2.5 rounded-xl font-black text-xs transition-all ${previewDevice === 'mobile' ? 'bg-[#1e1b4b] text-[#c5a059]' : 'text-slate-500'}`}><FaMobileAlt className="inline ml-2"/>جوال</button>
+            </div>
+        </div>
+        
+        <div className="flex flex-col items-center">
+           <div className={`transition-all duration-700 bg-white shadow-2xl overflow-hidden border-8 border-slate-900 rounded-[3.5rem] ${previewDevice === 'mobile' ? 'w-[375px] h-[667px]' : 'w-full max-w-5xl'}`}>
+             <div className="bg-slate-900 p-3 flex justify-between px-6 items-center">
+                <div className="flex gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div><div className="w-2 h-2 rounded-full bg-amber-500"></div></div>
+                <div className="bg-white/10 px-4 py-1 rounded text-[8px] text-slate-400 font-mono italic">EMBASSY-PREVIEW-SYSTEM</div>
+             </div>
+             <div className="overflow-y-auto h-full text-right" dir="rtl">
+                <article>
+                  <div className={`relative bg-slate-100 ${previewDevice === 'mobile' ? 'h-[200px]' : 'h-[400px]'}`}>
+                    {selectedMedia.length > 0 ? (
+                      selectedMedia[0].type === 'image' ? <img src={selectedMedia[0].url} className="w-full h-full object-cover" alt="" /> : <video src={selectedMedia[0].url} controls className="w-full h-full object-cover" />
+                    ) : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black italic">صورة الخبر الرئيسي</div>}
+                  </div>
+                  <div className="p-8">
+                    <h3 className={`${previewDevice === 'mobile' ? 'text-2xl' : 'text-4xl'} font-black text-[#1e1b4b] mb-4`}>{title || "عنوان الخبر..."}</h3>
+                    <p className="text-slate-500 text-sm font-bold mb-6 bg-slate-100 p-4 rounded-xl">{excerpt || "الملخص..."}</p>
+                    <div className="prose prose-slate max-w-none text-black leading-relaxed font-medium ql-editor !p-0 !min-h-0" dangerouslySetInnerHTML={{ __html: fullContent || "<p>محتوى الخبر...</p>" }} />
+                  </div>
+                </article>
+             </div>
+           </div>
+        </div>
+      </div>
+
+      {/* إعدادات النشر النهائية */}
+      <div className="max-w-7xl mx-auto mb-16">
+        <section className="bg-[#1e1b4b] rounded-[2.5rem] p-6 text-white shadow-2xl flex flex-col md:flex-row items-center gap-6 border border-white/5">
+            <div className="flex-1 flex flex-wrap items-center gap-6 w-full">
+              <div className="flex flex-col flex-1 min-w-[200px]">
+                <label className="text-[10px] text-slate-400 font-bold mb-2 mr-2">تصنيف الخبر:</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-4 rounded-xl bg-white/10 border border-white/20 font-black text-sm text-[#c5a059] outline-none cursor-pointer">
+                  <option className="bg-[#1e1b4b]" value="لقاءات وبيانات السفير">لقاءات وبيانات</option>
+                  <option className="bg-[#1e1b4b]" value="فعاليات وأنشطة">فعاليات وأنشطة</option>
+                  <option className="bg-[#1e1b4b]" value="إخطارات رسمية">إخطارات رسمية</option>
+                </select>
+              </div>
+              <div onClick={() => setIsPinned(!isPinned)} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all border-2 h-[58px] mt-6 ${isPinned ? 'bg-[#c5a059]/20 border-[#c5a059]' : 'bg-white/5 border-white/10'}`}>
+                <span className="font-black text-xs">تثبيت كخبر مميز</span>
+                <FaThumbtack className={isPinned ? 'text-[#c5a059] rotate-45' : 'text-slate-500'} />
+              </div>
+            </div>
+            <button 
+              onClick={handlePublish} 
+              disabled={isPublishing}
+              className={`w-full md:w-72 bg-[#c5a059] text-[#1e1b4b] py-5 rounded-2xl font-black text-xl hover:bg-white transition-all shadow-xl md:mt-6 active:scale-95 flex items-center justify-center gap-3 ${isPublishing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <FaSave /> {isPublishing ? 'جاري المعالجة...' : (editingId ? 'حفظ التعديلات' : 'نشر الخبر الآن')}
+            </button>
+        </section>
+      </div>
+
+      {/* أرشيف الأخبار والتحكم */}
+      <div className="max-w-7xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200">
+          <div className="p-8 border-b bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-6">
+            <h2 className="text-xl font-black text-[#1e1b4b] flex items-center gap-2 italic">
+              <FaCalendarAlt className="text-[#c5a059]" /> 
+              أرشيف الأخبار والتحكم
+            </h2>
+            <div className="flex flex-wrap gap-3 w-full md:w-auto">
+               <div className="relative flex-1 md:w-80">
+                 <FaSearch className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                 <input type="text" placeholder="ابحث في الأرشيف..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pr-12 pl-4 py-4 bg-white border-2 border-slate-200 rounded-2xl outline-none font-black text-sm text-right" />
+               </div>
+               <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                  {['الكل', 'لقاءات', 'فعاليات', 'إخطارات'].map((f) => (
+                    <button key={f} onClick={() => setFilterCategory(f)} className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${filterCategory === f ? 'bg-[#1e1b4b] text-[#c5a059] shadow-md' : 'text-slate-500'}`}>{f}</button>
+                  ))}
+               </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto min-h-[150px]">
+            <table className="w-full text-right">
+               <thead className="bg-slate-50 text-[#1e1b4b] text-[10px] font-black uppercase border-b">
+                 <tr><th className="p-6">الخبر</th><th className="p-6 text-center">التحكم</th></tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100">
+                  {filteredArchive.length > 0 ? filteredArchive.map((item) => (
+                    <tr key={item.id} className={`hover:bg-amber-50/30 transition-all group ${editingId === item.id ? 'bg-amber-50' : ''}`}>
+                      <td className="p-6">
+                        <div className="flex items-center gap-5">
+                          <div className="w-16 h-16 rounded-2xl bg-slate-100 border-2 border-white overflow-hidden shrink-0 shadow-md">
+                             <img src={item.image} className="w-full h-full object-cover" alt="" />
+                          </div>
+                          <div>
+                             <span className="font-black text-[#1e1b4b] text-base block mb-1">{item.title}</span>
+                             <span className="text-[10px] font-bold text-slate-400 italic">📅 {item.date} | 📂 {item.category}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-6 text-center">
+                         <div className="flex justify-center gap-3">
+                            <button 
+                              onClick={() => handleTogglePin(item)}
+                              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl transition-all text-[11px] font-black shadow-lg ${item.is_pinned ? 'bg-[#c5a059] text-[#1e1b4b]' : 'bg-[#1e1b4b] text-[#c5a059]'}`}
+                            >
+                                <FaThumbtack className={item.is_pinned ? "rotate-45" : ""} /> {item.is_pinned ? "مثبت" : "تثبيت"}
+                            </button>
+                            <button onClick={() => handleEditPreview(item)} className={`p-3.5 rounded-xl transition-all ${editingId === item.id ? 'bg-orange-500 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white'}`} title="تعديل"><FaEdit size={16} /></button>
+                            <button onClick={() => handleDelete(item.id)} className="p-3.5 bg-red-100 text-red-700 rounded-xl hover:bg-red-600 hover:text-white transition-all"><FaTrashAlt size={16} /></button>
+                         </div>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={2} className="p-10 text-center text-slate-400 italic font-bold">لا توجد أخبار حالية لعرضها..</td></tr>
+                  )}
+               </tbody>
+            </table>
+          </div>
+      </div>
+    </div>
+  );
+}

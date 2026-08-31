@@ -1,0 +1,86 @@
+"use client";
+import { FaPassport, FaFileAlt, FaCertificate, FaSignature, FaIdCard } from 'react-icons/fa';
+
+const consularServices = [
+  { 
+    title: "جوازات سفر  (حملة الهوية)", 
+    desc: "إجراءات تجديد وإصدار جوازات السفر للمواطنين الفلسطينيين حملة الهوية الفلسطينية.", 
+    icon: <FaPassport />,
+    tag: "حملة الهوية",
+    color: "bg-blue-50 text-blue-600 border-blue-100" 
+  },
+  { 
+    title: "جوازات سفر (استعمال خارجي)", 
+    desc: "إجراءات إصدار وتجديد الجوازات الخاصة للاستعمال الخارجي لحملة الوثائق الفلسطينية.", 
+    icon: <FaIdCard />,
+    tag: "حملة الوثائق",
+    color: "bg-indigo-50 text-indigo-600 border-indigo-100" 
+  },
+  { 
+    title: "الإفادات القنصلية", 
+    desc: "إصدار كافة أنواع الإفادات الرسمية (سكن، حالة اجتماعية، إثباتات قنصلية).", 
+    icon: <FaFileAlt />,
+    tag: "رسمي",
+    color: "bg-amber-50 text-amber-600 border-amber-100" 
+  },
+  { 
+    title: "التصديقات", 
+    desc: "تصديق الشهادات العلمية، الوثائق الرسمية، والشهادات الصادرة من الوطن.", 
+    icon: <FaCertificate />,
+    tag: "قانوني",
+    color: "bg-purple-50 text-purple-600 border-purple-100" 
+  },
+  { 
+    title: "الوكالات العدلية", 
+    desc: "تنظيم وتصديق الوكالات العامة والخاصة لضمان الحقوق القانونية للمواطنين.", 
+    icon: <FaSignature />,
+    tag: "قانوني",
+    color: "bg-rose-50 text-rose-600 border-rose-100" 
+  },
+];
+
+export default function Services() {
+  return (
+    <section id="services" className="py-24 bg-white" dir="rtl">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-right mb-16">
+          <h2 className="text-4xl font-black text-[#1e1b4b] mb-4">
+            الخدمات <span className="text-[#c5a059]">القنصلية</span>
+          </h2>
+          <div className="w-24 h-1.5 bg-[#c5a059] rounded-full"></div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {consularServices.map((service, index) => (
+            <div 
+              key={index}
+              className={`group relative bg-white p-10 rounded-[3rem] border-2 ${service.color.split(' ')[2]} shadow-sm hover:shadow-2xl transition-all duration-500`}
+            >
+              {/* Tag للتمييز الفوري */}
+              <div className={`absolute top-6 left-6 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${service.color}`}>
+                {service.tag}
+              </div>
+
+              <div className={`w-16 h-16 ${service.color.split(' ')[0]} ${service.color.split(' ')[1]} rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform`}>
+                <div className="text-3xl">{service.icon}</div>
+              </div>
+
+              <h3 className="text-2xl font-black text-[#1e1b4b] mb-4 group-hover:text-[#c5a059] transition-colors">
+                {service.title}
+              </h3>
+              
+              <p className="text-slate-500 leading-relaxed mb-8 font-medium">
+                {service.desc}
+              </p>
+
+              <button className="flex items-center gap-2 text-[#1e1b4b] font-black group-hover:gap-4 transition-all">
+                <span>المتطلبات والإجراءات</span>
+                <span className="text-[#c5a059]">←</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

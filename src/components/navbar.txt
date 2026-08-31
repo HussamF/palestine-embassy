@@ -1,0 +1,217 @@
+"use client";
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { FaChevronDown, FaBars, FaTimes, FaExclamationTriangle, FaInfoCircle, FaUserTie, FaBell, FaGlobeAmericas } from 'react-icons/fa';
+
+export default function Navbar() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // --- States للتحكم بالبانر ---
+  const [isAlertActive, setIsAlertActive] = useState(false);
+  const [alertType, setAlertType] = useState<'emergency' | 'info'>('info');
+  const [alertText, setAlertText] = useState("");
+
+  // دالة السكرول الذكية
+  const scrollToSection = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    setIsOpen(false); // إغلاق القائمة في الموبايل عند الضغط
+
+    // إذا كنا في الصفحة الرئيسية، اعمل سكرول
+    if (pathname === '/') {
+      const element = document.getElementById(id);
+      if (element) {
+        const offset = 100; // مسافة تعويضية للهيدر الثابت
+        const bodyRect = document.body.getBoundingClientRect().top;
+        const elementRect = element.getBoundingClientRect().top;
+        const elementPosition = elementRect - bodyRect;
+        const offsetPosition = elementPosition - offset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    } else {
+      // إذا كنا في صفحة أخرى، اذهب للرئيسية مع الـ hash
+      router.push(`/#${id}`);
+    }
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 40) setIsScrolled(true);
+      else setIsScrolled(false);
+    };
+
+    const loadAlertSettings = () => {
+      const savedAlert = localStorage.getItem('siteAlert');
+      if (savedAlert) {
+        try {
+          const parsed = JSON.parse(savedAlert);
+          setIsAlertActive(parsed.active);
+          setAlertType(parsed.type);
+          setAlertText(parsed.text);
+        } catch (e) {
+          console.error("Error parsing alert settings", e);
+        }
+      }
+    };
+
+    loadAlertSettings();
+    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('storage', loadAlertSettings);
+    const interval = setInterval(loadAlertSettings, 1000);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('storage', loadAlertSettings);
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <header className="fixed top-0 w-full z-[100] transition-all duration-500 transform-gpu">
+      
+      {/* 1. الـ Smart Alert Banner */}
+      {isAlertActive && (
+        <div className={`w-full py-2.5 px-4 shadow-lg ${
+          alertType === 'emergency' 
+          ? 'bg-gradient-to-r from-red-600 via-red-700 to-red-800' 
+          : 'bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900'
+        } text-white`}>
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
+            {alertType === 'emergency' ? 
+              <FaExclamationTriangle className="animate-pulse text-white/90" size={14} /> : 
+              <FaInfoCircle className="text-white/90" size={14} />
+            }
+            <p className="font-black text-[12px] md:text-sm tracking-wide text-center">
+              {alertText}
+            </p>
+            <button onClick={() => setIsAlertActive(false)} className="mr-auto text-white/50 hover:text-white transition-colors">
+              <FaTimes size={12} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. الـ Navbar */}
+      <nav className={`w-full transition-all duration-500 ${isScrolled ? "bg-white shadow-xl py-2" : "bg-[#1e1b4b] py-4"}`} dir="rtl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20 relative">
+            
+            {/* --- Right: Logo & Text --- */}
+            <Link href="/" className="flex items-center gap-3 shrink-0 cursor-pointer group">
+              <img src="/imgs/logo.png" alt="Logo" className="w-14 h-14 md:w-16 md:h-16 object-contain group-hover:scale-105 transition-transform" />
+              <div className="flex flex-col justify-center border-r-2 border-[#c5a059]/40 pr-3">
+                <h1 className={`text-lg md:text-xl font-black leading-tight transition-colors ${isScrolled ? "text-[#1e1b4b]" : "text-white"}`}>
+                  سفارة دولة فلسطين
+                </h1>
+                <p className="text-[#c5a059] text-[16px] md:text-xl font-bold tracking-widest">في دولة قطر</p>
+              </div>
+            </Link>
+
+            {/* --- Middle: Links --- */}
+            <div className="hidden lg:flex items-center gap-7 font-black">
+              <Link href="/" className={`text-lg hover:text-[#c5a059] transition-colors ${isScrolled ? "text-[#1e1b4b]" : "text-white"}`}>الرئيسية</Link>
+              
+              {/* Dropdown الأخبار */}
+              <div className="relative group"> 
+                <button 
+                  onClick={(e) => scrollToSection(e, 'news')}
+                  className={`flex items-center gap-1.5 text-lg hover:text-[#c5a059] py-8 transition-colors ${isScrolled ? "text-[#1e1b4b]" : "text-white"}`}
+                >
+                  الأخبار <FaChevronDown className="text-[10px] group-hover:rotate-180 transition-transform" />
+                </button>
+                <div className={`absolute top-[90%] right-[-20%] w-[320px] rounded-[2.5rem] p-4 shadow-2xl border transition-all opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:translate-y-2 ${
+                  isScrolled ? "bg-white text-[#1e1b4b] border-slate-100" : "bg-[#1e1b4b] text-white border-white/10"
+                }`}>
+                  <Link href="/news/category/statements" className="flex items-center gap-3 p-4 rounded-2xl hover:bg-[#c5a059]/10 transition-colors">
+                    <span className="text-xl">🎙️</span>
+                    <div className="font-black text-sm text-inherit">لقاءات وبيانات السفير</div>
+                  </Link>
+                  <Link href="/news/category/activities" className="flex items-center gap-3 p-4 rounded-2xl hover:bg-[#c5a059]/10 transition-colors">
+                    <span className="text-xl">📅</span>
+                    <div className="font-black text-sm text-inherit">فعاليات وأنشطة</div>
+                  </Link>
+                  {/* الرابط الجديد */}
+                  <hr className="my-2 border-slate-100 opacity-20" />
+                  <Link href="/news/category/all" className="flex items-center gap-3 p-4 rounded-2xl bg-[#c5a059]/10 hover:bg-[#c5a059]/20 transition-colors group/item">
+                    <FaGlobeAmericas className="text-xl text-[#c5a059]" />
+                    <div className="font-black text-sm text-[#c5a059]">أرشيف الأخبار الكامل</div>
+                  </Link>
+                </div>
+              </div>
+
+              <Link href="/ambassador" className={`flex items-center gap-2 text-lg hover:text-[#c5a059] transition-colors ${isScrolled ? "text-[#1e1b4b]" : "text-white"}`}>
+                <FaUserTie className="text-[#c5a059] text-sm" /> السفير
+              </Link>
+
+              <button onClick={(e) => scrollToSection(e, 'services')} className={`text-lg hover:text-[#c5a059] transition-colors ${isScrolled ? "text-[#1e1b4b]" : "text-white"}`}>الخدمات</button>
+              <button onClick={(e) => scrollToSection(e, 'footer')} className={`text-lg hover:text-[#c5a059] transition-colors ${isScrolled ? "text-[#1e1b4b]" : "text-white"}`}>التواصل</button>
+
+              <Link href="/news/category/notices" className={`flex items-center gap-2 text-lg transition-colors group ${
+                isScrolled ? "text-red-600" : "text-red-400 hover:text-red-300"
+              }`}>
+                <div className="relative">
+                   <FaBell className="group-hover:animate-ring" />
+                   <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                   </span>
+                </div>
+                إخطارات
+              </Link>
+            </div>
+
+            {/* --- Left: Flag & Toggle --- */}
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:block w-14 h-14 md:w-16 md:h-16 overflow-hidden transition-transform hover:scale-105 duration-300">
+                <img src="/imgs/flag.png" alt="Flag" className="object-contain w-full h-full" />
+              </div>
+
+              <button onClick={() => setIsOpen(!isOpen)} className={`lg:hidden p-2 rounded-xl transition-all ${isScrolled ? "text-[#1e1b4b] bg-slate-100" : "text-white bg-white/10"}`}>
+                {isOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
+              </button>
+            </div>
+          </div>
+
+          {/* --- Mobile Menu --- */}
+          <div className={`lg:hidden transition-all duration-500 ease-in-out overflow-hidden ${isOpen ? "max-h-[800px] opacity-100 pb-8 mt-4" : "max-h-0 opacity-0"}`}>
+            <div className={`flex flex-col gap-2 p-5 rounded-[2.5rem] border ${isScrolled ? "bg-white text-[#1e1b4b] border-slate-200 shadow-2xl" : "bg-[#1e1b4b]/98 text-white border-white/10"}`}>
+              <Link href="/" className="font-black text-xl p-4" onClick={() => setIsOpen(false)}>الرئيسية</Link>
+              <div className="flex flex-col gap-2 p-4 bg-slate-500/5 rounded-3xl border border-white/5">
+                <span className="font-black text-lg text-[#c5a059] mb-1">الأخبار</span>
+                <Link href="/news/category/statements" onClick={() => setIsOpen(false)} className="text-base font-bold pr-4 py-2 border-r-2 border-[#c5a059]/30">🎙️ لقاءات السفير</Link>
+                <Link href="/news/category/activities" onClick={() => setIsOpen(false)} className="text-base font-bold pr-4 py-2 border-r-2 border-[#c5a059]/30">📅 فعاليات وأنشطة</Link>
+                <Link href="/news/category/all" onClick={() => setIsOpen(false)} className="text-base font-bold pr-4 py-2 border-r-2 border-gold text-[#c5a059]">🌐 أرشيف الأخبار</Link>
+              </div>
+              <Link href="/ambassador" className="font-black text-xl p-4 flex items-center gap-2" onClick={() => setIsOpen(false)}>
+                <FaUserTie className="text-[#c5a059]" size={18} /> السفير
+              </Link>
+              <button onClick={(e) => scrollToSection(e, 'services')} className="font-black text-xl p-4 text-right">الخدمات</button>
+              <button onClick={(e) => scrollToSection(e, 'footer')} className="font-black text-xl p-4 text-right">التواصل</button>
+              <Link href="/news/category/notices" className="font-black text-xl p-4 text-red-500 flex items-center gap-2" onClick={() => setIsOpen(false)}>
+                <FaBell size={18} /> إخطارات هامة
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+      
+      <style jsx>{`
+        @keyframes ring {
+          0%, 100% { transform: rotate(0); }
+          25% { transform: rotate(15deg); }
+          75% { transform: rotate(-15deg); }
+        }
+        :global(.group-hover\:animate-ring) {
+          animation: ring 0.5s ease-in-out infinite;
+        }
+      `}</style>
+    </header>
+  );
+}
